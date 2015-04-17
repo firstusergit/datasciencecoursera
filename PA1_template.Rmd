@@ -1,0 +1,176 @@
+## Coursera: Reproducible Research Assignment 1
+
+## Load and prepare data
+
+```{r}
+library(knitr)
+if(!file.exists("getdata-projectfiles-UCI HAR Dataset.zip")) {
+        temp <- tempfile()
+        download.file("http://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip",temp, method ="curl")
+        unzip(temp)
+        unlink(temp)
+}
+
+activity <- read.csv("activity.csv", stringsAsFactors = FALSE)
+str(activity)
+```
+
+Note data column containing date not properly formatted, so adjust
+
+```{r}
+activity$date <- as.Date(activity$date)
+str(activity)
+```
+
+noted some missing values, do a count how many
+
+```{r}
+sum(is.na(activity$steps))
+```
+
+## What is the mean total number of steps taken per day?
+But first need to remove missing values
+So create activity_rm as file without missing values
+
+```{r}
+activity_rm<-activity[which(!is.na(activity$steps)),]
+```
+
+Since number of steps taken is measured in timeslots of 5-minute intervals, we sum up data by day ---to get total number of steps taken for each day
+
+```{r}
+perday<-tapply(activity_rm$steps, activity_rm$date, sum)
+```
+
+Now per day dataset has total number of steps taken for each day -- in Oct and Nov , a total of 53 days
+display a histogram 
+
+```{r}
+hist(perday,10, main = "Total number of steps taken per day", xlab = "")
+```
+
+The mean total number of steps for whole day is 10766
+The median of the total steps is 10765
+
+```{r}
+mean(perday)
+median(perday)
+```
+
+## What is the average daily activity pattern?
+We explore data throughout the day by aggregating the dataset by intervals.
+Create a per interval array
+Create a time series plot
+X-axis point labels: names of intervals in dataset
+Coding of interval names: 500 as 5:00 and 1000 as 10:00
+So x-axis as full 24-hour day: starts from midnight and ends next midnight hour
+
+```{r}
+dailyact<-tapply(activity_rm$steps, activity_rm$interval, mean)
+plot(y = dailyact, x = names(dailyact), type = "l", xlab = "5-Minute-Interval", 
+    main = "Daily Activity Pattern", ylab = "Average number of steps")
+```
+
+See graph of daily activity pattern
+From graph deduce that at interval :835
+max average number of steps throughout the day: 206.1698 steps
+
+```{r}
+dailyact[dailyact==max(dailyact)]
+```
+
+## Inputting missing values
+reminder: how many there were regarding the steps variable
+Check the other two variables do not have any missing data
+
+```{r}
+sum(is.na(activity$steps))
+```
+
+```{r}
+sum(is.na(activity))
+```
+
+count of missing values for coloum of steps is the same as 
+total number missing in the whole dataset.
+So we are convinced the intervals and the dates do not have any.
+2304 = 13.11% on total observations, so there is some bias.
+To exclude the bias, have to come up with a method to fill in all missing values in dataset.
+One quick way: use mean/median for that day, or mean for that 5-minute interval.
+Let's use the option: mean of 5-minute interval.
+Create a new dataset that is equal to the original dataset but with missing values filled in.
+
+```{r}
+act_new <- activity
+act_new[which(is.na(act_new$steps)),1]<-
+        dailyact[as.character(act_new[which(is.na(act_new$steps)),3])]
+```
+
+No missing values in the new dataset now
+
+```{r}
+sum(is.na(act_new))
+```
+
+Make same histogram to see visually if there is any big difference
+
+```{r}
+perday_new<-tapply(act_new$steps, act_new$date, sum)
+
+par(mfrow=c(1,2))
+hist(perday,10, main = "Total number of steps taken per day", xlab = "Steps"
+     , ylim =c(0, 25))
+abline(v = median(perday), col = 4, lwd = 4)
+hist(perday_new,10, main = "Total number of steps taken per day  
+     (missing values replaced with mean of interval)", xlab = "Steps",
+     ylim =c(0, 25))
+abline(v = median(perday_new), col = 4, lwd = 4)
+```
+
+Now calculate median and mean of the filled-in dataset
+
+```{r}
+mean(perday_new)
+median(perday_new)
+```
+
+Impact of inputting missing data is minimal as only the median seems to be changing but by just over one step
+
+```{r}
+mean(perday_new)-mean(perday)
+median(perday_new)-median(perday)
+```
+
+## Are there any differences in activity patterns between weekdays and weekends?
+
+Create a factor variable in the dataset with two levels -- weekdays and weekends
+
+```{r}
+act_new$wd<-weekdays(act_new$date)
+act_new$fwd<- as.factor(c("weekend", "weekday"))
+act_new[act_new$wd == "Sunday" | act_new$wd == "Saturday" ,5]<- factor("weekend")
+act_new[!(act_new$wd == "Sunday" | act_new$wd == "Saturday"),5 ]<- factor("weekday")
+```
+
+Create 2 aggregated arrays for the total number of steps taken per 5-minute interval for weekdays and weekends.
+Make a graph to see if there is a difference.
+Use plot in base system.
+
+```{r}
+act_new_we <- subset(act_new, fwd == "weekend") 
+act_new_wd <- subset(act_new, fwd == "weekday") 
+dailyact_we<-tapply(act_new_we$steps, act_new_we$interval, mean)
+dailyact_wd<-tapply(act_new_wd$steps, act_new_wd$interval, mean)
+par(mfrow=c(2,1))
+plot(y = dailyact_wd, x = names(dailyact_wd), type = "l", xlab = "5-Minute Interval", 
+     main = "Daily Activity Pattern on Weekdays", ylab = "Average number of steps", 
+     ylim =c(0, 250))
+plot(y = dailyact_we, x = names(dailyact_we), type = "l", xlab = "5-Minute Interval", 
+     main = "Daily Activity Pattern on Weekends", ylab = "Average number of steps", 
+     ylim =c(0, 250))
+```
+
+Observation notes: From the two graphs, we can tell that the distribution throughout the day is quite different. Particpants seem to wake up later (at least an hour later) on weekends. Also, more steps are taken on weekdays as compared to weekends. Generally, the whole weekend seems to be more evenly distributed with no huge deviations during awake/active hours.
+Please note x-axis as a full 24-hour-day starting from midnight and ending at the next midnight hour.
+
+     
