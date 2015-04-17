@@ -1,5 +1,7 @@
 ## Coursera: Reproducible Research Assignment 1
 
+### Chan Wai Leng Coursera
+
 ## Load and prepare data
 
 ```{r}
